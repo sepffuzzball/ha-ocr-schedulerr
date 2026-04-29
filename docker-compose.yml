@@ -1,0 +1,8 @@
+services:
+  ha-ocr-scheduler:
+    build: .
+    container_name: ha-ocr-scheduler
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=${TZ:-America/New_York}
