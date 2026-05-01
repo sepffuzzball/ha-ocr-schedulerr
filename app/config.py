@@ -18,6 +18,7 @@ class Config:
     openai_base_url: str
     openai_model: str
     ai_parser_enabled: bool
+    ai_timeout: int
 
     @classmethod
     def from_env(cls) -> Config:
@@ -38,6 +39,7 @@ class Config:
             "yes",
             "on",
         }
+        ai_timeout = int(os.environ.get("AI_TIMEOUT", "60"))
 
         if not token:
             raise ValueError("TELEGRAM_BOT_TOKEN is required")
@@ -59,4 +61,5 @@ class Config:
             openai_base_url=openai_base_url.rstrip("/"),
             openai_model=openai_model,
             ai_parser_enabled=ai_parser_enabled,
+            ai_timeout=ai_timeout,
         )

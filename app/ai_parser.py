@@ -24,6 +24,7 @@ class AIScheduleParser:
         self.api_key = config.openai_api_key
         self.base_url = config.openai_base_url
         self.model = config.openai_model
+        self.timeout = config.ai_timeout
         self.enabled = config.ai_parser_enabled and bool(config.openai_api_key)
 
     async def parse_image(self, image_path: str | Path) -> list[ScheduleEntry]:
@@ -36,7 +37,7 @@ class AIScheduleParser:
             return []
 
         payload = self._build_payload(image_path)
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=float(self.timeout)) as client:
             response = await client.post(
                 f"{self.base_url}/chat/completions",
                 headers={
