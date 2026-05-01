@@ -109,7 +109,14 @@ docker compose up -d
 
 ### 6. Send a schedule image
 
-Open Telegram, send your bot a photo of a schedule. It will respond with parsed entries and creation results.
+**Direct message (DM):** Send a photo of a schedule — the bot will process it automatically.
+
+**Group chat:** The bot stays quiet unless explicitly invoked:
+- `/schedule` with an attached photo
+- `/schedule` replying to a photo
+- Send a photo with `@YourBotUsername` in the caption
+
+All other messages and photos in group chats are ignored.
 
 ## Development
 
@@ -151,11 +158,13 @@ Flow: Telegram photo → download → AI vision parse → OCR fallback → parse
 
 | Issue | Fix |
 |---|---|
+| Bot ignores photos in group chat | Use `/schedule` command or `@mention` the bot in the caption |
+| Bot doesn't respond at all | Check `TELEGRAM_BOT_TOKEN` and container logs |
 | OCR returns no text | Ensure image is clear, well-lit, and has high contrast |
 | Wrong dates parsed | Check OCR output in logs; may need image preprocessing |
 | HA event creation fails | Verify `HA_URL`, `HA_TOKEN`, and `HA_CALENDAR_ENTITY` |
-| Bot doesn't respond | Check `TELEGRAM_BOT_TOKEN` and container logs |
 | "Unauthorized" | Add your chat ID to `ALLOWED_CHAT_IDS` |
+| `/schedule` says "send a photo" | Attach the photo to the command, or reply to an existing photo |
 
 ## License
 
