@@ -37,12 +37,15 @@ class HomeAssistantClient:
         start_dt = entry.start_datetime(self.timezone)
         end_dt = entry.end_datetime(self.timezone)
 
+        # Send naive datetimes — HA treats them as its own local timezone.
+        # Sending tz-aware datetimes causes a double-offset bug where HA
+        # converts UTC→local on top of the already-local time.
         summary = entry.label or "Schedule"
         payload = {
             "entity_id": self.calendar_entity,
             "summary": summary,
-            "start_date_time": start_dt.isoformat(),
-            "end_date_time": end_dt.isoformat(),
+            "start_date_time": start_dt.replace(tzinfo=None).isoformat(),
+            "end_date_time": end_dt.replace(tzinfo=None).isoformat(),
         }
 
         url = f"{self.base_url}/api/services/calendar/create_event"
