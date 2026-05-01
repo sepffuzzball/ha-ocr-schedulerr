@@ -37,6 +37,7 @@ class AIScheduleParser:
             return []
 
         payload = self._build_payload(image_path)
+        logger.info("AI parser request payload model=%s", payload.get("model"))
         async with httpx.AsyncClient(timeout=float(self.timeout)) as client:
             response = await client.post(
                 f"{self.base_url}/chat/completions",
@@ -46,29 +47,34 @@ class AIScheduleParser:
                 },
                 json=payload,
             )
+            if response.status_code != 200:
+                logger.error(
+                    "AI parser error %d: %s", response.status_code, response.text
+                )
             response.raise_for_status()
 
         content = response.json()["choices"][0]["message"]["content"]
         logger.info("AI parser response: %s", content)
-        parsed = json.loads(content)
+
+        # Extract JSON from the response — the model may wrap it in markdown
+        parsed = _extract_json(content)
         return parse_ai_schedule_payload(parsed)
 
     def _build_payload(self, image_path: str | Path) -> dict[str, Any]:
         image_path = Path(image_path)
         mime_type = mimetypes.guess_type(image_path.name)[0] or "image/jpeg"
         image_b64 = base64.b64encode(image_path.read_bytes()).decode("ascii")
-        data_url = f"data:{mime_type};base64,{image_b64}"
 
         return {
             "model": self.model,
-            "temperature": 0,
-            "response_format": {"type": "json_object"},
+            "temperature": 0.0,
             "messages": [
                 {
                     "role": "system",
                     "content": (
                         "You extract work schedules from mobile screenshots. "
-                        "Return only valid JSON. Do not guess shifts for dates that show no time range. "
+                        "Return ONLY valid JSON — no markdown, no explanation. "
+                        "Do not guess shifts for dates that show no time range. "
                         "If the image has dates without years, use null for year."
                     ),
                 },
@@ -86,11 +92,44 @@ class AIScheduleParser:
                                 "empty days, and unrelated UI text."
                             ),
                         },
-                        {"type": "image_url", "image_url": {"url": data_url}},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{image_b64}",
+                            },
+                        },
                     ],
                 },
             ],
         }
+
+
+def _extract_json(text: str) -> dict[str, Any]:
+    """Extract JSON from model output that may be wrapped in markdown fences."""
+    text = text.strip()
+    # Try direct parse first
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # Strip markdown code fences if present
+    if text.startswith("```"):
+        lines = text.split("\n")
+        # Remove first line (```json or ```) and last line (```)
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    # Find first { and last } to extract embedded JSON
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1:
+        try:
+            return json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            pass
+    raise ValueError(f"Could not extract JSON from AI response: {text[:200]}")
 
 
 def parse_ai_schedule_payload(payload: dict[str, Any]) -> list[ScheduleEntry]:
