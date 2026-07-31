@@ -65,9 +65,9 @@ class AIScheduleParser:
         mime_type = mimetypes.guess_type(image_path.name)[0] or "image/jpeg"
         image_b64 = base64.b64encode(image_path.read_bytes()).decode("ascii")
 
+        # Explicit temperature omitted for reasoning-model/OpenAI-compatible API support
         return {
             "model": self.model,
-            "temperature": 0.0,
             "messages": [
                 {
                     "role": "system",

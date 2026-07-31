@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from app.ai_parser import parse_ai_schedule_payload
+from pathlib import Path
+
+from app.ai_parser import AIScheduleParser, parse_ai_schedule_payload
+from app.config import Config
 
 
 def test_parse_ai_payload_from_example_schedule():
@@ -43,3 +46,38 @@ def test_parse_ai_payload_ignores_empty_days_and_bad_rows():
 
     assert len(entries) == 1
     assert entries[0].date.day == 11
+
+
+def test_build_payload_no_temperature_and_data_url(tmp_path: Path) -> None:
+    """Regression: _build_payload must omit temperature, produce correct multimodal URL."""
+    config = Config(
+        telegram_token="fake",
+        ha_url="http://fake",
+        ha_token="fake",
+        ha_calendar_entity="fake",
+        timezone="UTC",
+        allowed_chat_ids=[1],
+        openai_api_key="sk-fake",
+        openai_base_url="https://api.openai.com/v1",
+        openai_model="gpt-4o",
+        ai_parser_enabled=True,
+        ai_timeout=30,
+    )
+    parser = AIScheduleParser(config)
+    bytes_content = b"\x00\x01\x02\x03"
+    jpg_path = tmp_path / "schedule.jpg"
+    jpg_path.write_bytes(bytes_content)
+    payload = parser._build_payload(str(jpg_path))
+    assert "temperature" not in payload
+    assert payload["model"] == "gpt-4o"
+    assert "messages" in payload
+    user_msg = payload["messages"][1]
+    assert user_msg["role"] == "user"
+    assert len(user_msg["content"]) == 2
+    text_part = user_msg["content"][0]
+    assert text_part["type"] == "text"
+    assert text_part["text"].startswith("Read this schedule image")
+    image_part = user_msg["content"][1]
+    assert image_part["type"] == "image_url"
+    expected_url = "data:image/jpeg;base64,AAECAw=="
+    assert image_part["image_url"]["url"] == expected_url
